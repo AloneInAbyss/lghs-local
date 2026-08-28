@@ -1,16 +1,59 @@
-import Docker from "dockerode";
+import { existsSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
+import Docker from "dockerode";
 import { sleep } from "../duration.js";
 import type { Instance } from "../types.js";
 
 export const RCON_PORT = 25575;
 export const GAME_CONTAINER_PORT = 25565;
 
+function isWsl(): boolean {
+  return Boolean(process.env.WSL_DISTRO_NAME) || os.release().toLowerCase().includes("microsoft");
+}
+
+function unixSocketCandidates(): string[] {
+  const fromEnv = process.env.DOCKER_HOST?.replace(/^unix:\/\//, "");
+  return [...new Set([fromEnv, "/var/run/docker.sock", "/run/docker.sock"].filter((p): p is string => Boolean(p)))];
+}
+
+function missingDockerMessage(tried: string[]): string {
+  const distro = process.env.WSL_DISTRO_NAME ?? "Ubuntu";
+  if (isWsl()) {
+    return [
+      `Docker não está acessível no WSL (${distro}): nenhum socket (${tried.join(", ")}).`,
+      "O cliente `docker` no WSL não basta — o engine do Docker Desktop precisa estar ligado a esta distro.",
+      "",
+      "1. Abra o Docker Desktop no Windows e espere ficar verde (Engine running).",
+      "2. Settings → Resources → WSL Integration.",
+      `3. Ative a integração para “${distro}” (Enable integration with additional distros).`,
+      "4. Apply & Restart.",
+      "5. Neste terminal: `docker version` — tem que aparecer Client e Server.",
+      "",
+      "Alternativa: `npm run dev` no PowerShell do Windows, com o Desktop aberto.",
+    ].join("\n");
+  }
+  if (process.platform === "win32") {
+    return "Docker não respondeu. Abra o Docker Desktop e espere Engine running (named pipe docker_engine).";
+  }
+  return `Docker não está acessível (sockets ${tried.join(", ")}). Suba o daemon ou defina DOCKER_HOST.`;
+}
+
 export function createDocker(): Docker {
+  const hostEnv = process.env.DOCKER_HOST;
+  if (hostEnv?.startsWith("tcp://")) {
+    const u = new URL(hostEnv);
+    return new Docker({ host: u.hostname, port: Number(u.port || 2375) });
+  }
   if (process.platform === "win32") {
     return new Docker({ socketPath: "//./pipe/docker_engine" });
   }
-  return new Docker({ socketPath: process.env.DOCKER_HOST?.replace("unix://", "") ?? "/var/run/docker.sock" });
+  const tried = unixSocketCandidates();
+  const socketPath = tried.find((p) => existsSync(p));
+  if (!socketPath) {
+    throw new Error(missingDockerMessage(tried));
+  }
+  return new Docker({ socketPath });
 }
 
 export async function waitForDocker(docker: Docker, timeoutMs = 180_000): Promise<void> {
@@ -25,9 +68,10 @@ export async function waitForDocker(docker: Docker, timeoutMs = 180_000): Promis
       await sleep(2000);
     }
   }
-  throw new Error(
-    `Docker não respondeu a tempo. No Windows, confirme o Docker Desktop e o auto-logon. ${String(lastError)}`,
-  );
+  const hint = isWsl()
+    ? "No WSL, `docker version` precisa mostrar Server. Veja Settings → WSL Integration no Docker Desktop."
+    : "No Windows, confirme o Docker Desktop (Engine running) e o auto-logon.";
+  throw new Error(`Docker não respondeu a tempo. ${hint} ${String(lastError)}`);
 }
 
 export function containerName(instanceId: string): string {
