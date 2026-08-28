@@ -372,8 +372,10 @@ SIGINT/SIGTERM: o bot sai; o container de jogo **continua**.
 | “só funcionam no canal configurado” | Você não está no `channelId` |
 | Sem permissão em `/stop` | A role do `adminRoleId` tem que estar **nessa conta**, neste servidor |
 | `/list` vazio | Pasta `paths.instances/<id>/manifest.yml`; `id` sem espaços |
+| Console do bot sem log do Minecraft | Esperado no código antigo; agora o start imprime `[host]` / `[docker]` / `[mc]`. Reinicie `npm run dev` |
 | `ENOENT /var/run/docker.sock` ou `docker version` só Client | Docker Desktop aberto no Windows; **Settings → Resources → WSL Integration** ligada para esta distro; `docker version` tem que mostrar Server |
-| Start aceito, nunca anuncia | Pack ainda carregando; `readyTimeout`; `docker logs lghs-<id>`; `startCommand` (precisa ser `run.sh`, não `.bat`) |
+| Start aceito, nunca anuncia | Pack ainda carregando; `readyTimeout`; linhas `[mc]` no terminal; `startCommand` tem que existir em `server/` (não numa subpasta tipo `ATM10-server/`) |
+| `Permission denied` em `./startserver.sh` | Zip/Windows sem bit `+x`. O bot dá `chmod` nos `.sh` e chama o script via `bash`, sem depender de executável |
 | Mundo “zerado” | Mundo antigo ficou em `server/world` e foi tapado pelo mount de `world/` |
 | Amigos não entram | Firewall, port forward, CGNAT, Cloudflare **proxied** (tem que ser DNS only) |
 | Dois bots | Já existe `bot.pid`; mate o outro processo |

@@ -1,4 +1,5 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { chmod, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { parseMemoryBytes } from "../../duration.js";
 import { connectAddress, gamePort } from "../../inventory.js";
@@ -65,6 +66,41 @@ async function upsertJvmArgs(file: string, memory: string): Promise<void> {
   await writeFile(file, `${next}\n`, "utf8");
 }
 
+async function assertStartScript(instance: Instance): Promise<void> {
+  const token = instance.manifest.startCommand.trim().split(/\s+/)[0] ?? "";
+  const rel = token.replace(/^\.\//, "");
+  const scriptPath = path.join(instance.dir, "server", rel);
+  if (existsSync(scriptPath)) return;
+
+  const extras = (await readdir(instance.dir, { withFileTypes: true }))
+    .filter((e) => e.isDirectory() && !["server", "world", "backups", "overrides"].includes(e.name))
+    .map((e) => e.name);
+
+  let msg = `Não achei "${instance.manifest.startCommand}" em server/ (${scriptPath}). O pack extraído (mods, installer, startserver.sh) precisa ficar em server/.`;
+  if (extras.length > 0) {
+    msg += ` Encontrei ${extras.join(", ")} — se o pack está aí, mova o conteúdo para server/ e rode /start de novo.`;
+  }
+  throw new Error(msg);
+}
+
+async function ensureShellScriptsExecutable(serverDir: string): Promise<void> {
+  const names = await readdir(serverDir);
+  await Promise.all(
+    names
+      .filter((name) => name.endsWith(".sh"))
+      .map((name) => chmod(path.join(serverDir, name), 0o755).catch(() => undefined)),
+  );
+}
+
+function containerStartCommand(startCommand: string): string[] {
+  const trimmed = startCommand.trim();
+  const token = trimmed.split(/\s+/)[0] ?? "";
+  const alreadyViaShell = token === "bash" || token === "sh" || token === "dash";
+  const isScript = !alreadyViaShell && (token.startsWith("./") || token.endsWith(".sh"));
+  const inner = isScript ? `bash ${trimmed}` : trimmed;
+  return ["bash", "-lc", inner];
+}
+
 export async function prepareMinecraft(
   instance: Instance,
   secrets: Secrets,
@@ -75,6 +111,9 @@ export async function prepareMinecraft(
   await mkdir(serverDir, { recursive: true });
   await mkdir(worldDir, { recursive: true });
   await mkdir(backupsDir, { recursive: true });
+
+  await assertStartScript(instance);
+  await ensureShellScriptsExecutable(serverDir);
 
   await writeFile(path.join(serverDir, "eula.txt"), "eula=true\n", "utf8");
 
@@ -105,9 +144,10 @@ export function dockerSpec(config: LghsConfig, instance: Instance): RunSpec {
   return {
     image: javaImage(instance.manifest.java),
     workingDir: "/data/server",
-    cmd: ["bash", "-lc", instance.manifest.startCommand],
+    cmd: containerStartCommand(instance.manifest.startCommand),
     env: [
       `TZ=${config.timezone}`,
+      "ATM10_RESTART=false",
     ],
     binds: [
       `${toDockerBindPath(serverDir)}:/data/server`,

@@ -22,6 +22,8 @@ import {
   waitForExit,
   waitUntilExit,
   containerName,
+  followContainerLogs,
+  recentContainerLogs,
 } from "./docker.js";
 import { loadState, saveState } from "./state.js";
 
@@ -40,6 +42,7 @@ export class Host extends EventEmitter {
   private state: RuntimeState = idleState();
   private readyAbort: AbortController | null = null;
   private backupTimer: ReturnType<typeof setInterval> | null = null;
+  private stopLogs: (() => void) | null = null;
   private watchGeneration = 0;
   private readonly docker = createDocker();
 
@@ -102,6 +105,7 @@ export class Host extends EventEmitter {
       startedAt: new Date().toISOString(),
     };
     await saveState(this.config, this.state);
+    console.log(`[host] start pedido: ${instance.id} por ${actor.label}`);
     void this.runStart(instance, actor);
     return {
       ok: true,
@@ -224,17 +228,34 @@ export class Host extends EventEmitter {
     const signal = this.readyAbort.signal;
 
     try {
+      console.log(`[host] preparando ${instance.id}`);
       await prepareMinecraft(instance, this.secrets);
       const spec = dockerSpec(this.config, instance);
       await createAndStart(this.docker, instance, spec);
       if (signal.aborted) {
+        this.clearLogFollow();
         await removeContainerIfExists(this.docker, containerName(instance.id)).catch(() => undefined);
         return;
       }
+      this.clearLogFollow();
+      this.stopLogs = await followContainerLogs(this.docker, instance.id);
       this.attachWatch(instance);
 
       const timeoutMs = parseDuration(instance.manifest.readyTimeout);
-      await waitUntilReady(this.config, instance, timeoutMs, signal);
+      console.log(`[host] aguardando Server List Ping (timeout ${instance.manifest.readyTimeout})`);
+
+      let readySettled = false;
+      const ready = waitUntilReady(this.config, instance, timeoutMs, signal).then(() => {
+        readySettled = true;
+      });
+      ready.catch(() => undefined);
+      const died = waitUntilExit(this.docker, instance.id).then(async () => {
+        if (readySettled || signal.aborted) return;
+        const tail = await recentContainerLogs(this.docker, instance.id);
+        const extra = tail.trim() ? `\n--- logs ---\n${tail.trim()}` : "";
+        throw new Error(`O container encerrou antes do servidor ficar pronto.${extra}`);
+      });
+      await Promise.race([ready, died]);
 
       this.state = {
         status: "running",
@@ -250,12 +271,16 @@ export class Host extends EventEmitter {
         address: announceAddress(this.config, instance),
       });
     } catch (err) {
-      if (signal.aborted) {
+      const userCancel = signal.aborted;
+      this.readyAbort?.abort();
+      if (userCancel) {
+        this.clearLogFollow();
         await removeContainerIfExists(this.docker, containerName(instance.id)).catch(() => undefined);
         return;
       }
       const message = err instanceof Error ? err.message : String(err);
       console.error(`[host] falha no start de ${instance.id}:`, message);
+      this.clearLogFollow();
       this.clearBackupTimer();
       this.watchGeneration += 1;
       await removeContainerIfExists(this.docker, containerName(instance.id)).catch(() => undefined);
@@ -271,6 +296,7 @@ export class Host extends EventEmitter {
     const instance = await findInstance(this.config, id);
     this.watchGeneration += 1;
     this.readyAbort?.abort();
+    this.clearLogFollow();
     this.clearBackupTimer();
     this.state = { ...this.state, status: "stopping" };
     await saveState(this.config, this.state);
@@ -344,5 +370,10 @@ export class Host extends EventEmitter {
       clearInterval(this.backupTimer);
       this.backupTimer = null;
     }
+  }
+
+  private clearLogFollow(): void {
+    this.stopLogs?.();
+    this.stopLogs = null;
   }
 }

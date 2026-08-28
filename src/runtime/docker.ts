@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { Writable, type Readable } from "node:stream";
 import Docker from "dockerode";
 import { sleep } from "../duration.js";
 import type { Instance } from "../types.js";
@@ -84,10 +85,12 @@ export function toDockerBindPath(hostPath: string): string {
 }
 
 export async function pullImage(docker: Docker, image: string): Promise<void> {
+  console.log(`[docker] puxando imagem ${image}…`);
   const stream = await docker.pull(image);
   await new Promise<void>((resolve, reject) => {
     docker.modem.followProgress(stream, (err) => (err ? reject(err) : resolve()));
   });
+  console.log(`[docker] imagem ${image} ok`);
 }
 
 export async function removeContainerIfExists(docker: Docker, name: string): Promise<void> {
@@ -162,7 +165,70 @@ export async function createAndStart(
   });
 
   await container.start();
+  console.log(`[docker] container ${name} no ar`);
   return container;
+}
+
+function prefixWriter(prefix: string): Writable {
+  let leftover = "";
+  return new Writable({
+    write(chunk, _enc, cb) {
+      leftover += chunk.toString("utf8");
+      const lines = leftover.split("\n");
+      leftover = lines.pop() ?? "";
+      for (const line of lines) {
+        console.log(`${prefix}${line}`);
+      }
+      cb();
+    },
+    final(cb) {
+      if (leftover) console.log(`${prefix}${leftover}`);
+      cb();
+    },
+  });
+}
+
+export async function followContainerLogs(docker: Docker, instanceId: string): Promise<() => void> {
+  const container = docker.getContainer(containerName(instanceId));
+  const stream = (await container.logs({
+    follow: true,
+    stdout: true,
+    stderr: true,
+    timestamps: false,
+  })) as unknown as Readable;
+
+  docker.modem.demuxStream(stream, prefixWriter("[mc] "), prefixWriter("[mc] "));
+  stream.on("error", () => undefined);
+
+  return () => {
+    stream.destroy();
+  };
+}
+
+function decodeDockerLogs(buf: Buffer): string {
+  const parts: string[] = [];
+  let offset = 0;
+  while (offset + 8 <= buf.length) {
+    const size = buf.readUInt32BE(offset + 4);
+    const end = offset + 8 + size;
+    if (end > buf.length) break;
+    parts.push(buf.subarray(offset + 8, end).toString("utf8"));
+    offset = end;
+  }
+  return parts.join("") || buf.toString("utf8");
+}
+
+export async function recentContainerLogs(docker: Docker, instanceId: string): Promise<string> {
+  try {
+    const buf = (await docker.getContainer(containerName(instanceId)).logs({
+      stdout: true,
+      stderr: true,
+      tail: 80,
+    })) as Buffer;
+    return decodeDockerLogs(Buffer.isBuffer(buf) ? buf : Buffer.from(String(buf)));
+  } catch {
+    return "";
+  }
 }
 
 export async function waitUntilExit(docker: Docker, instanceId: string): Promise<void> {
