@@ -329,3 +329,14 @@ Um jogo ativo por vez. Extensão a novos títulos = novo adapter + manifest, sem
 | Backups | `tar.gz` via lib Node |
 
 Serviço do bot: tarefa/serviço no Windows (MVP); unit systemd no Ubuntu depois. Documentado na instalação, não no core.
+
+---
+
+## 12. Rodar (desenvolvimento)
+
+1. Node 22+, Docker Desktop (ou Docker Engine) rodando
+2. Copiar [`lghs.example.yml`](lghs.example.yml) → `lghs.yml` e [`.env.example`](.env.example) → `.env`; preencher token, IDs do Discord, senha RCON e (opcional) token Cloudflare
+3. Colocar o server pack em `paths.instances/<id>/` com `manifest.yml` (exemplo em [`examples/instances/atm10/`](examples/instances/atm10/manifest.yml))
+4. `npm install` e `npm run dev`
+
+O bot não para o jogo ao receber SIGINT/SIGTERM — só desconecta o Discord.

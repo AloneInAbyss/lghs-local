@@ -1,0 +1,14 @@
+discord:
+  guildId: "123"
+  channelId: "456"
+  adminRoleId: "789"
+network:
+  hostname: mc.exemplo.com
+  gamePort: 25565
+  cloudflare:
+    zone: exemplo.com
+    record: mc
+paths:
+  instances: ./data/instances
+  runtime: ./data/runtime
+timezone: America/Sao_Paulo

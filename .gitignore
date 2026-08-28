@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.env
+lghs.yml
+data/
+*.log
+.DS_Store
