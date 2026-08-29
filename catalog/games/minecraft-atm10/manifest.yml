@@ -1,0 +1,9 @@
+displayName: ATM10
+game: minecraft
+java: 21
+memory: 8G
+startCommand: "./startserver.sh"
+readyTimeout: 15m
+backup:
+  interval: 6h
+  retain: 7

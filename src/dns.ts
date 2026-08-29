@@ -1,3 +1,4 @@
+import { log, logWarn } from "./log.js";
 import type { LghsConfig, Secrets } from "./types.js";
 
 interface CfEnvelope<T> {
@@ -33,7 +34,7 @@ async function publicIp(): Promise<string> {
 
 export async function updateDdns(config: LghsConfig, secrets: Secrets): Promise<void> {
   if (!secrets.CLOUDFLARE_API_TOKEN) {
-    console.warn("[dns] CLOUDFLARE_API_TOKEN vazio — DDNS ignorado");
+    logWarn("dns", "CLOUDFLARE_API_TOKEN vazio — DDNS ignorado");
     return;
   }
 
@@ -59,7 +60,7 @@ export async function updateDdns(config: LghsConfig, secrets: Secrets): Promise<
     throw new Error(`Registro A ${fqdn} não encontrado na zona`);
   }
   if (record.content === ip) {
-    console.log(`[dns] ${fqdn} já aponta para ${ip}`);
+    log("dns", `${fqdn} já aponta para ${ip}`);
     return;
   }
 
@@ -69,13 +70,13 @@ export async function updateDdns(config: LghsConfig, secrets: Secrets): Promise<
     `https://api.cloudflare.com/client/v4/zones/${zoneId}/dns_records/${record.id}`,
     { type: "A", name: fqdn, content: ip, ttl: 120, proxied: false },
   );
-  console.log(`[dns] ${fqdn} → ${ip}`);
+  log("dns", `${fqdn} → ${ip}`);
 }
 
 export function startDdnsLoop(config: LghsConfig, secrets: Secrets): () => void {
   const tick = () => {
     void updateDdns(config, secrets).catch((err) => {
-      console.warn("[dns] falha:", err instanceof Error ? err.message : err);
+      logWarn("dns", `falha: ${err instanceof Error ? err.message : String(err)}`);
     });
   };
   tick();

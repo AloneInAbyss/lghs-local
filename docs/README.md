@@ -29,7 +29,7 @@ O objetivo é tornar o ciclo de vida do servidor de jogo o mais automatizado pos
 | --- | --- |
 | Pessoas no dia a dia | 2–4 |
 | Pico eventual | ~12 (ex.: fim de ano) |
-| Interface | Somente Discord (slash commands) |
+| Interface | Discord (amigos) + **console local 127.0.0.1** (operador/debug) |
 | Canal | Canal de bots já existente — comandos e anúncios no mesmo lugar |
 | Host | PC sobressalente, pode ficar 24/7; a máquina de desenvolvimento usa o mesmo SO |
 | Desligues longos | Ok (meses sem uso); religar deve exigir o mínimo de trabalho |
@@ -39,7 +39,7 @@ O objetivo é tornar o ciclo de vida do servidor de jogo o mais automatizado pos
 | SO futuro | Ubuntu Server (mesmo código; paths, Docker e serviço via config + docs) |
 | Runtime dos jogos | Docker — **containers Linux** (não Windows containers) |
 | Docker no Windows | Docker Desktop (backend WSL2), uso pessoal |
-| Painel web | Fora de escopo |
+| Painel web | Público / para o grupo: fora de escopo. Console local (`127.0.0.1`) para o operador: sim |
 
 O jogo sempre roda em imagem Linux (`eclipse-temurin`, `run.sh`, etc.), mesmo com o host em Windows. Isso é o que deixa o Ubuntu posterior barato: o adapter não muda, só o jeito de instalar o bot e o daemon Docker.
 

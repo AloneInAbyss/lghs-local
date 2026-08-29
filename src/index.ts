@@ -1,25 +1,19 @@
-import { loadConfig } from "./config.js";
-import { startBot } from "./discord/bot.js";
-import { startDdnsLoop } from "./dns.js";
-import { acquirePid } from "./pid.js";
-import { Host } from "./runtime/host.js";
+import { config as loadDotenv } from "dotenv";
+import path from "node:path";
+import { Appliance } from "./appliance.js";
+import { startConsole } from "./console/server.js";
+import { log, logError } from "./log.js";
 
 async function main(): Promise<void> {
-  const { config, secrets, configPath } = await loadConfig();
-  console.log(`[lghs] config ${configPath}`);
-  console.log(`[lghs] instances ${config.paths.instances}`);
-  await acquirePid(config.paths.runtime);
-
-  const host = new Host(config, secrets);
-  await host.init();
-
-  const stopDdns = startDdnsLoop(config, secrets);
-  const client = await startBot(config, secrets, host);
+  loadDotenv({ path: path.join(process.cwd(), ".env") });
+  const app = new Appliance();
+  await app.boot();
+  const consoleServer = startConsole(app);
 
   const shutdown = (signal: string) => {
-    console.log(`[lghs] ${signal} — encerrando o bot (o jogo continua)`);
-    stopDdns();
-    client.destroy();
+    log("lghs", `${signal} — encerrando o console e o Discord (o jogo continua)`);
+    consoleServer.close();
+    app.shutdown();
     process.exit(0);
   };
   process.on("SIGINT", () => shutdown("SIGINT"));
@@ -27,6 +21,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((err) => {
-  console.error("[lghs] fatal:", err);
+  logError("lghs", `fatal: ${err instanceof Error ? err.stack ?? err.message : String(err)}`);
   process.exit(1);
 });

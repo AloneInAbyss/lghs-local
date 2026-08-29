@@ -2,7 +2,7 @@
 
 **lghs-local** — *Leonhart's Game Hosting System Local*
 
-Host de jogos no PC de casa, controlado só pelo Discord: subir, parar, ver status, backup e comandos no servidor. O MVP é Minecraft com modpack (Forge / Fabric / NeoForge). Uma instância por vez.
+Host de jogos no PC de casa: Discord para o grupo, **console local** (`127.0.0.1`) para o operador. MVP Minecraft com modpack. Uma instância por vez.
 
 O bot Node roda **nativo no Windows**. O jogo roda em **container Linux** (Docker Desktop). O mesmo código serve depois num Ubuntu.
 
@@ -14,13 +14,14 @@ Decisões de produto: [docs/README.md](docs/README.md).
 
 1. [Requisitos](#requisitos)
 2. [Roteiro de configuração inicial](#roteiro-de-configuração-inicial)
-3. [Comandos Discord](#comandos-discord)
-4. [Layout de uma instância](#layout-de-uma-instância)
-5. [Referência de config](#referência-de-config)
-6. [Rede (amigos pela internet)](#rede-amigos-pela-internet)
-7. [PC 24/7 (spare)](#pc-247-spare)
-8. [Desenvolvimento](#desenvolvimento)
-9. [Problemas comuns](#problemas-comuns)
+3. [Console local](#console-local)
+4. [Comandos Discord](#comandos-discord)
+5. [Layout de uma instância](#layout-de-uma-instância)
+6. [Referência de config](#referência-de-config)
+7. [Rede (amigos pela internet)](#rede-amigos-pela-internet)
+8. [PC 24/7 (spare)](#pc-247-spare)
+9. [Desenvolvimento](#desenvolvimento)
+10. [Problemas comuns](#problemas-comuns)
 
 ---
 
@@ -175,28 +176,23 @@ backup:
 
 **Mundo:** o container monta `world/` **por cima** de `server/world`. Se você já testou o pack e o mundo ficou em `server/world`, **mova** essa pasta para `data/instances/<id>/world/` antes do `/start`. Senão o bot sobe um mundo novo e o antigo fica escondido.
 
-### 6. Subir o bot
+### 6. Subir o appliance
 
 Docker Desktop **running**. Na raiz do repo:
 
 ```bash
+npm install
 npm run dev
 ```
 
-Log esperado, mais ou menos:
+Abra **http://127.0.0.1:8787** (só neste computador).
 
-```text
-[lghs] config .../lghs.yml
-[lghs] instances .../data/instances
-[discord] online como SeuBot#1234
-```
+- Sem `lghs.yml`: o assistente pede token do Discord, servidor, canal, role e senha RCON, depois sobe o bot.
+- Com config: dashboard (estado, instâncias, catálogo, logs por stream).
 
-- Se faltar `lghs.yml` ou `DISCORD_TOKEN` / `RCON_PASSWORD`, o processo morre com mensagem clara.
-- Se o Docker ainda estiver abrindo, o bot espera até ~3 min e então falha.
+No terminal deve aparecer `console local em http://127.0.0.1:8787`. Ctrl+C desliga o console e o Discord; **não** para o Minecraft no Docker.
 
-Deixe esse terminal aberto. Ctrl+C só desconecta o Discord; **não** para o Minecraft se ele já estiver no Docker.
-
-Slash commands são registrados no servidor na hora do login. Na primeira vez podem levar alguns segundos para o Discord mostrar `/start`.
+Slash commands são registrados no login. Na primeira vez podem levar alguns segundos para o Discord mostrar `/start`.
 
 ### 7. Testar no canal
 
@@ -232,6 +228,23 @@ RCON (`25575`) **não** entra no roteador.
 3. [API Token](https://dash.cloudflare.com/profile/api-tokens) com o template **Edit zone DNS**, só nessa zona.
 4. Cole em `CLOUDFLARE_API_TOKEN`. Em `lghs.yml`: `zone` = domínio raiz, `record` = `mc`, `hostname` = `mc.seudominio.com`.
 5. Reinicie o bot. A cada 5 min ele atualiza o A se o IP mudou.
+
+---
+
+## Console local
+
+Interface do operador em **http://127.0.0.1:8787** (não exponha na internet). O grupo continua no Discord.
+
+| Painel | Função |
+| --- | --- |
+| Estado | idle / starting / running / stopping, instância, endereço, Discord |
+| Instâncias | Start, Stop, Backup, comando RCON |
+| Logs | Escolha o stream (`lghs`, `docker`, `minecraft`, `discord`, `dns`, `backup` ou todos) |
+| Catálogo | Manifest + guia a partir de [`catalog/`](catalog/index.yml). `CATALOG_URL` aponta para um repo GitHub raw se você publicar o catálogo separado. O zip do modpack **não** é baixado |
+
+O bind padrão é `127.0.0.1`. `CONSOLE_TOKEN` no `.env` exige `Authorization: Bearer` (e `?token=` no SSE). `CONSOLE_BIND` só se você souber o risco de abrir na LAN.
+
+Start pelo console usa o mesmo `Host` do Discord (mutex, anúncios no canal se o bot estiver online).
 
 ---
 
@@ -289,9 +302,13 @@ Path relativo é resolvido **a partir da pasta do `lghs.yml`**. Outro arquivo: v
 
 | Chave | Obrigatório |
 | --- | --- |
-| `DISCORD_TOKEN` | sim |
-| `RCON_PASSWORD` | sim |
+| `DISCORD_TOKEN` | sim (ou via assistente) |
+| `RCON_PASSWORD` | sim (ou gerada no assistente) |
 | `CLOUDFLARE_API_TOKEN` | não (DDNS desliga) |
+| `CONSOLE_TOKEN` | não |
+| `CONSOLE_PORT` | não (default 8787) |
+| `CONSOLE_BIND` | não (default `127.0.0.1`) |
+| `CATALOG_URL` | não (usa [`catalog/`](catalog/index.yml) local) |
 
 ### `manifest.yml`
 
@@ -366,7 +383,7 @@ SIGINT/SIGTERM: o bot sai; o container de jogo **continua**.
 
 | Sintoma | O que checar |
 | --- | --- |
-| `lghs.yml não encontrado` | Rodar `npm run dev` na **raiz** do repo, ou definir `LGHS_CONFIG` |
+| `lghs.yml` ausente | Normal no first-run: abra http://127.0.0.1:8787 e complete o assistente |
 | Discord: bot offline | Token, `npm run dev` ainda rodando, bot convidado no servidor certo |
 | Comandos não aparecem | Scopes `applications.commands`; esperar 1 min; canal/servidor IDs certos |
 | “só funcionam no canal configurado” | Você não está no `channelId` |
@@ -391,4 +408,4 @@ Logs do Minecraft: `instances/<id>/server/logs/` no host (bind mount). No Discor
 | [docs/README.md](docs/README.md) | Brief de produto (decisões do MVP) |
 | [lghs.example.yml](lghs.example.yml) | Config global de exemplo |
 | [.env.example](.env.example) | Secrets |
-| [examples/instances/atm10/manifest.yml](examples/instances/atm10/manifest.yml) | Manifest mínimo |
+| [catalog/](catalog/index.yml) | Catálogo de jogos (manifest + guia, sem zip) |

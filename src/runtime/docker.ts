@@ -4,6 +4,7 @@ import path from "node:path";
 import { Writable, type Readable } from "node:stream";
 import Docker from "dockerode";
 import { sleep } from "../duration.js";
+import { log } from "../log.js";
 import type { Instance } from "../types.js";
 
 export const RCON_PORT = 25575;
@@ -85,12 +86,12 @@ export function toDockerBindPath(hostPath: string): string {
 }
 
 export async function pullImage(docker: Docker, image: string): Promise<void> {
-  console.log(`[docker] puxando imagem ${image}…`);
+  log("docker", `puxando imagem ${image}…`);
   const stream = await docker.pull(image);
   await new Promise<void>((resolve, reject) => {
     docker.modem.followProgress(stream, (err) => (err ? reject(err) : resolve()));
   });
-  console.log(`[docker] imagem ${image} ok`);
+  log("docker", `imagem ${image} ok`);
 }
 
 export async function removeContainerIfExists(docker: Docker, name: string): Promise<void> {
@@ -165,7 +166,7 @@ export async function createAndStart(
   });
 
   await container.start();
-  console.log(`[docker] container ${name} no ar`);
+  log("docker", `container ${name} no ar`);
   return container;
 }
 
@@ -177,12 +178,12 @@ function prefixWriter(prefix: string): Writable {
       const lines = leftover.split("\n");
       leftover = lines.pop() ?? "";
       for (const line of lines) {
-        console.log(`${prefix}${line}`);
+        log("minecraft", line);
       }
       cb();
     },
     final(cb) {
-      if (leftover) console.log(`${prefix}${leftover}`);
+      if (leftover) log("minecraft", leftover);
       cb();
     },
   });

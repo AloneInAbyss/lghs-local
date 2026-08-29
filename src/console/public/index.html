@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>lghs-local</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="top">
+      <div>
+        <strong>lghs-local</strong>
+        <span class="muted">console do operador · só neste PC</span>
+      </div>
+      <div id="top-status" class="muted">conectando…</div>
+    </header>
+
+    <main id="wizard" class="wizard hidden">
+      <h1>Assistente de instalação</h1>
+      <p class="lead">
+        O bot Discord roda neste computador. Crie uma Application no
+        <a href="https://discord.com/developers/applications" target="_blank" rel="noreferrer">Developer Portal</a>,
+        copie o token do bot, convide-o ao servidor e volte aqui.
+      </p>
+      <ol class="steps">
+        <li>
+          <label>Token do bot</label>
+          <input id="w-token" type="password" autocomplete="off" />
+          <button type="button" id="w-inspect">Validar token</button>
+          <p id="w-bot" class="muted"></p>
+          <p id="w-invite"></p>
+        </li>
+        <li>
+          <label>Servidor</label>
+          <select id="w-guild"></select>
+          <button type="button" id="w-guild-load">Carregar canais e roles</button>
+        </li>
+        <li>
+          <label>Canal (comandos e anúncios)</label>
+          <select id="w-channel"></select>
+          <label>Role de admin (<code>/stop</code>, <code>/backup</code>, <code>/cmd</code>)</label>
+          <select id="w-role"></select>
+        </li>
+        <li>
+          <label>Hostname anunciado</label>
+          <input id="w-host" value="mc.exemplo.com" />
+          <label>Porta</label>
+          <input id="w-port" type="number" value="25565" />
+          <label>Senha RCON</label>
+          <input id="w-rcon" />
+          <button type="button" id="w-rcon-gen">Gerar</button>
+        </li>
+        <li>
+          <label>Cloudflare zona (opcional)</label>
+          <input id="w-cf-zone" placeholder="exemplo.com" />
+          <label>Registro A</label>
+          <input id="w-cf-record" placeholder="mc" />
+          <label>API token Cloudflare</label>
+          <input id="w-cf-token" type="password" autocomplete="off" />
+        </li>
+      </ol>
+      <button type="button" class="primary" id="w-save">Gravar e iniciar</button>
+      <p id="w-err" class="error"></p>
+    </main>
+
+    <main id="dash" class="dash hidden">
+      <section class="col">
+        <article class="card">
+          <h2>Estado</h2>
+          <dl id="state"></dl>
+        </article>
+        <article class="card">
+          <h2>Instâncias</h2>
+          <div id="instances"></div>
+          <div class="row">
+            <button type="button" id="btn-stop">Stop</button>
+            <button type="button" id="btn-backup">Backup</button>
+          </div>
+          <div class="row">
+            <input id="cmd" placeholder="comando RCON (list, say …)" />
+            <button type="button" id="btn-cmd">Enviar</button>
+          </div>
+          <p id="action-msg" class="muted"></p>
+        </article>
+        <article class="card">
+          <h2>Catálogo</h2>
+          <p class="muted">Manifest + guia. O zip do pack você baixa na origem (CurseForge/Modrinth).</p>
+          <div id="catalog"></div>
+          <pre id="guide" class="guide hidden"></pre>
+        </article>
+      </section>
+      <section class="logs card">
+        <div class="log-bar">
+          <h2>Logs</h2>
+          <select id="stream">
+            <option value="all">todos</option>
+            <option value="lghs">lghs</option>
+            <option value="docker">docker</option>
+            <option value="minecraft">minecraft</option>
+            <option value="discord">discord</option>
+            <option value="dns">dns</option>
+            <option value="backup">backup</option>
+          </select>
+          <label class="chk"><input type="checkbox" id="follow" checked /> seguir</label>
+          <button type="button" id="btn-clear">Limpar</button>
+        </div>
+        <pre id="logview"></pre>
+      </section>
+    </main>
+    <script src="/app.js"></script>
+  </body>
+</html>

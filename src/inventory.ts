@@ -1,6 +1,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { parse as parseYaml } from "yaml";
+import { logWarn } from "./log.js";
 import { manifestSchema, type Instance, type LghsConfig } from "./types.js";
 
 const FOLDER_ID = /^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/;
@@ -28,7 +29,7 @@ export async function scanInstances(config: LghsConfig): Promise<Instance[]> {
     } catch (err) {
       const code = (err as NodeJS.ErrnoException).code;
       if (code === "ENOENT") continue;
-      console.warn(`[scan] ignorando ${id}:`, err instanceof Error ? err.message : err);
+      logWarn("lghs", `scan ignorando ${id}: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 

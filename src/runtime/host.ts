@@ -25,6 +25,7 @@ import {
   followContainerLogs,
   recentContainerLogs,
 } from "./docker.js";
+import { log, logError, logWarn } from "../log.js";
 import { loadState, saveState } from "./state.js";
 
 export interface Actor {
@@ -105,7 +106,7 @@ export class Host extends EventEmitter {
       startedAt: new Date().toISOString(),
     };
     await saveState(this.config, this.state);
-    console.log(`[host] start pedido: ${instance.id} por ${actor.label}`);
+    log("lghs", `start pedido: ${instance.id} por ${actor.label}`);
     void this.runStart(instance, actor);
     return {
       ok: true,
@@ -191,7 +192,7 @@ export class Host extends EventEmitter {
 
     const instance = await findInstance(this.config, s.instanceId);
     if (!instance) {
-      console.warn(`[host] estado aponta para ${s.instanceId}, pasta sumiu — idle`);
+      logWarn("lghs", `estado aponta para ${s.instanceId}, pasta sumiu — idle`);
       this.state = idleState();
       await saveState(this.config, this.state);
       return;
@@ -206,13 +207,13 @@ export class Host extends EventEmitter {
 
     const up = await inspectRunning(this.docker, containerName(instance.id));
     if (up && s.status === "running") {
-      console.log(`[host] ${instance.id} ainda no Docker — reassumindo`);
+      log("lghs", `${instance.id} ainda no Docker — reassumindo`);
       this.attachWatch(instance);
       this.startBackupTimer(instance);
       return;
     }
 
-    console.log(`[host] revive ${instance.id}`);
+    log("lghs", `revive ${instance.id}`);
     this.state = {
       ...s,
       status: "starting",
@@ -228,7 +229,7 @@ export class Host extends EventEmitter {
     const signal = this.readyAbort.signal;
 
     try {
-      console.log(`[host] preparando ${instance.id}`);
+      log("lghs", `preparando ${instance.id}`);
       await prepareMinecraft(instance, this.secrets);
       const spec = dockerSpec(this.config, instance);
       await createAndStart(this.docker, instance, spec);
@@ -242,7 +243,7 @@ export class Host extends EventEmitter {
       this.attachWatch(instance);
 
       const timeoutMs = parseDuration(instance.manifest.readyTimeout);
-      console.log(`[host] aguardando Server List Ping (timeout ${instance.manifest.readyTimeout})`);
+      log("lghs", `aguardando Server List Ping (timeout ${instance.manifest.readyTimeout})`);
 
       let readySettled = false;
       const ready = waitUntilReady(this.config, instance, timeoutMs, signal).then(() => {
@@ -279,7 +280,7 @@ export class Host extends EventEmitter {
         return;
       }
       const message = err instanceof Error ? err.message : String(err);
-      console.error(`[host] falha no start de ${instance.id}:`, message);
+      logError("lghs", `falha no start de ${instance.id}: ${message}`);
       this.clearLogFollow();
       this.clearBackupTimer();
       this.watchGeneration += 1;
@@ -305,7 +306,7 @@ export class Host extends EventEmitter {
       try {
         await gracefulStop(this.secrets);
       } catch (err) {
-        console.warn("[host] RCON stop falhou, encerrando container:", err);
+        logWarn("lghs", `RCON stop falhou, encerrando container: ${err instanceof Error ? err.message : String(err)}`);
       }
       const exited = await waitForExit(this.docker, id, 90_000);
       if (!exited) {
@@ -339,7 +340,7 @@ export class Host extends EventEmitter {
       if (generation !== this.watchGeneration) return;
       if (this.state.status !== "running" || this.state.instanceId !== instance.id) return;
 
-      console.warn(`[host] container de ${instance.id} caiu — revive`);
+      logWarn("lghs", `container de ${instance.id} caiu — revive`);
       this.state = { ...this.state, status: "starting" };
       await saveState(this.config, this.state);
       await sleep(5000);
@@ -357,9 +358,9 @@ export class Host extends EventEmitter {
         try {
           await createBackup(this.config, instance, this.secrets, { running: true });
           await maybeAnchors(this.config, instance, this.secrets, true);
-          console.log(`[backup] snapshot de ${instance.id}`);
+          log("backup", `snapshot de ${instance.id}`);
         } catch (err) {
-          console.warn("[backup] falha agendada:", err instanceof Error ? err.message : err);
+          logWarn("backup", `falha agendada: ${err instanceof Error ? err.message : String(err)}`);
         }
       })();
     }, ms);

@@ -1,0 +1,5 @@
+games:
+  - id: minecraft-atm10
+    displayName: All the Mods 10
+    game: minecraft
+    summary: NeoForge 1.21 — server pack oficial, não redistribuído aqui

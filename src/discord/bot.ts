@@ -10,8 +10,9 @@ import {
   type AutocompleteInteraction,
   type ChatInputCommandInteraction,
 } from "discord.js";
-import type { LghsConfig, Secrets } from "../types.js";
+import { log, logError } from "../log.js";
 import type { Host } from "../runtime/host.js";
+import type { LghsConfig, Secrets } from "../types.js";
 
 const ADMIN = new Set(["stop", "backup", "cmd"]);
 
@@ -164,7 +165,7 @@ export async function startBot(config: LghsConfig, secrets: Secrets, host: Host)
     await rest.put(Routes.applicationGuildCommands(ready.application.id, config.discord.guildId), {
       body: commands(),
     });
-    console.log(`[discord] online como ${ready.user.tag}`);
+    log("discord", `online como ${ready.user.tag}`);
   });
 
   client.on(Events.InteractionCreate, async (interaction) => {
@@ -176,7 +177,7 @@ export async function startBot(config: LghsConfig, secrets: Secrets, host: Host)
       if (!interaction.isChatInputCommand()) return;
       await handleCommand(interaction, config, host);
     } catch (err) {
-      console.error("[discord] interação:", err);
+      logError("discord", `interação: ${err instanceof Error ? err.message : String(err)}`);
       if (interaction.isRepliable() && !interaction.replied && !interaction.deferred) {
         await interaction.reply({
           content: "Erro interno ao processar o comando.",
